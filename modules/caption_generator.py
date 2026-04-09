@@ -8,7 +8,7 @@ class CaptionGenerator:
     def __init__(self, config):
         self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
         self.logger = logging.getLogger(__name__)
-        self.fixed_tag = str(config.get("fixed_hashtag", "#BoyishLife")).strip()
+        self.fixed_tag = str(config.get("fixed_hashtag", "#arul9x")).strip()
         self.caption_limit = int(config.get("caption_limit", 2200))
 
     def generate(self, filename, media_type):
