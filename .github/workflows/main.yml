@@ -5,7 +5,6 @@ on:
   schedule:
     # GitHub Actions cron uses UTC.
     # 00:30 UTC = 06:00 AM Asia/Calcutta (IST)
-    - cron: "30 0 * * *"
 
 jobs:
   run-instagram:
