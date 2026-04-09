@@ -1,7 +1,5 @@
-import atexit
 import logging
 import os
-import threading
 
 import requests
 
@@ -12,10 +10,6 @@ class TelegramLogHandler(logging.Handler):
         self.token = os.getenv("TELEGRAM_LOG_BOT_TOKEN", "").strip()
         self.chat_id = os.getenv("TELEGRAM_LOG_CHAT_ID", "").strip()
         self.session = requests.Session()
-        self.buffer = []
-        self.lock = threading.Lock()
-        self.sent = False
-        atexit.register(self.flush)
 
     def emit(self, record):
         if not self.token or not self.chat_id:
@@ -25,29 +19,11 @@ class TelegramLogHandler(logging.Handler):
             message = self.format(record)
             if not message:
                 return
-            with self.lock:
-                self.buffer.append(message)
-        except Exception:
-            # Logging transport failures must never break the main workflow.
-            return
 
-    def flush(self):
-        if not self.token or not self.chat_id:
-            return
-
-        try:
-            with self.lock:
-                if self.sent or not self.buffer:
-                    return
-                combined_message = "\n".join(self.buffer).strip()
-                self.sent = True
-
-            if not combined_message:
-                return
-
-            for chunk in self._chunk_message(combined_message):
+            for chunk in self._chunk_message(message):
                 self._send_message(chunk)
         except Exception:
+            # Logging transport failures must never break the main workflow.
             return
 
     def _chunk_message(self, message, limit=4000):
@@ -74,3 +50,4 @@ class TelegramLogHandler(logging.Handler):
             data={"chat_id": self.chat_id, "text": text},
             timeout=15,
         )
+
