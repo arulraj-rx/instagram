@@ -50,3 +50,4 @@ class TelegramLogHandler(logging.Handler):
             data={"chat_id": self.chat_id, "text": text},
             timeout=15,
         )
+
