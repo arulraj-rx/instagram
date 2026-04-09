@@ -26,7 +26,7 @@ def safe_trim_caption(text: str, limit: int) -> str:
 
 
 def load_config():
-    with open("config.json", "r", encoding="utf-8") as handle:
+    with open("config.json", "r", encoding="utf-8-sig") as handle:
         return json.load(handle)
 
 
