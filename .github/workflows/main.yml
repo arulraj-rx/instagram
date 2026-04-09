@@ -2,9 +2,7 @@ name: Instagram Scheduler
 
 on:
   workflow_dispatch:
-  schedule:
-    # GitHub Actions cron uses UTC.
-    # 00:30 UTC = 06:00 AM Asia/Calcutta (IST)
+  
 
 jobs:
   run-instagram:
