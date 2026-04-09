@@ -94,3 +94,4 @@ class InstagramPoster:
 
         if status != "FINISHED":
             raise Exception("IG video processing timeout")
+
