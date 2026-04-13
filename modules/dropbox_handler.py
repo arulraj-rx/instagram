@@ -34,8 +34,9 @@ class DropboxHandler:
         if not files:
             return None
 
-        files.sort(key=lambda item: (getattr(item, "server_modified", None), item.name.lower()))
-        return files[0]
+        selected = random.choice(files)
+        self.logger.info(f"Randomly selected file: {selected.name}")
+        return selected
 
     def detect_media_type(self, filename):
         extension = os.path.splitext(filename)[1].lower()
