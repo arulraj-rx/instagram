@@ -29,8 +29,16 @@ class DropboxHandler:
 def get_next_file(self):
     files = self._list_files(self.conf["source_folder"])
 
-    images = [f for f in files if self.detect_media_type(f.name) == "image"]
-    videos = [f for f in files if self.detect_media_type(f.name) == "video"]
+    images = []
+    videos = []
+
+    # Separate files by type (efficient)
+    for entry in files:
+        media_type = self.detect_media_type(entry.name)
+        if media_type == "image":
+            images.append(entry)
+        elif media_type == "video":
+            videos.append(entry)
 
     if not images and not videos:
         return None
@@ -41,15 +49,20 @@ def get_next_file(self):
         weights=[60, 40]
     )[0]
 
+    # Select based on type
     if media_type == "image" and images:
         selected = random.choice(images)
     elif media_type == "video" and videos:
         selected = random.choice(videos)
     else:
-        # fallback if one type is empty
+        # fallback (important if one type empty)
         selected = random.choice(images or videos)
 
-    self.logger.info(f"Selected {media_type}: {selected.name}")
+    self.logger.info(
+        f"Selected {media_type}: {selected.name} | "
+        f"Images={len(images)}, Videos={len(videos)}"
+    )
+
     return selected
 
     def detect_media_type(self, filename):
