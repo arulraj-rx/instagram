@@ -1,6 +1,7 @@
 name: Instagram Scheduler
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "0 0 * * *"
     - cron: "12 1 * * *"
