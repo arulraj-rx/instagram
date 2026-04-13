@@ -47,7 +47,7 @@ class DropboxHandler:
         # 🎯 60% image / 40% video
         media_type = random.choices(
             ["image", "video"],
-            weights=[60, 40]
+            weights=[51, 49]
         )[0]
 
         if media_type == "image" and images:
