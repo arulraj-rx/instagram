@@ -26,44 +26,44 @@ class DropboxHandler:
             self.logger.info("Dropbox client initialized")
         return self.client
 
-def get_next_file(self):
-    files = self._list_files(self.conf["source_folder"])
-
-    images = []
-    videos = []
-
-    # Separate files by type (efficient)
-    for entry in files:
-        media_type = self.detect_media_type(entry.name)
-        if media_type == "image":
-            images.append(entry)
-        elif media_type == "video":
-            videos.append(entry)
-
-    if not images and not videos:
-        return None
-
-    # 🎯 60% image, 40% video
-    media_type = random.choices(
-        ["image", "video"],
-        weights=[60, 40]
-    )[0]
-
-    # Select based on type
-    if media_type == "image" and images:
-        selected = random.choice(images)
-    elif media_type == "video" and videos:
-        selected = random.choice(videos)
-    else:
-        # fallback (important if one type empty)
-        selected = random.choice(images or videos)
-    actual_type = self.detect_media_type(selected.name)
-    self.logger.info(
-        f"Selected {media_type}: {selected.name} | "
-        f"Images={len(images)}, Videos={len(videos)}"
-    )
-
-    return selected
+    def get_next_file(self):
+        files = self._list_files(self.conf["source_folder"])
+    
+        images = []
+        videos = []
+    
+        # Separate files by type (efficient)
+        for entry in files:
+            media_type = self.detect_media_type(entry.name)
+            if media_type == "image":
+                images.append(entry)
+            elif media_type == "video":
+                videos.append(entry)
+    
+        if not images and not videos:
+            return None
+    
+        # 🎯 60% image, 40% video
+        media_type = random.choices(
+            ["image", "video"],
+            weights=[60, 40]
+        )[0]
+    
+        # Select based on type
+        if media_type == "image" and images:
+            selected = random.choice(images)
+        elif media_type == "video" and videos:
+            selected = random.choice(videos)
+        else:
+            # fallback (important if one type empty)
+            selected = random.choice(images or videos)
+        actual_type = self.detect_media_type(selected.name)
+        self.logger.info(
+            f"Selected {media_type}: {selected.name} | "
+            f"Images={len(images)}, Videos={len(videos)}"
+        )
+    
+        return selected
 
     def detect_media_type(self, filename):
         extension = os.path.splitext(filename)[1].lower()
