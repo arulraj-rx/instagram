@@ -26,18 +26,31 @@ class DropboxHandler:
             self.logger.info("Dropbox client initialized")
         return self.client
 
-    def get_next_file(self):
-        files = [
-            entry
-            for entry in self._list_files(self.conf["source_folder"])
-            if self.detect_media_type(entry.name) in {"image", "video"}
-        ]
-        if not files:
-            return None
+def get_next_file(self):
+    files = self._list_files(self.conf["source_folder"])
 
-        selected = random.choice(files)
-        self.logger.info(f"Randomly selected file: {selected.name}")
-        return selected
+    images = [f for f in files if self.detect_media_type(f.name) == "image"]
+    videos = [f for f in files if self.detect_media_type(f.name) == "video"]
+
+    if not images and not videos:
+        return None
+
+    # 🎯 60% image, 40% video
+    media_type = random.choices(
+        ["image", "video"],
+        weights=[60, 40]
+    )[0]
+
+    if media_type == "image" and images:
+        selected = random.choice(images)
+    elif media_type == "video" and videos:
+        selected = random.choice(videos)
+    else:
+        # fallback if one type is empty
+        selected = random.choice(images or videos)
+
+    self.logger.info(f"Selected {media_type}: {selected.name}")
+    return selected
 
     def detect_media_type(self, filename):
         extension = os.path.splitext(filename)[1].lower()
