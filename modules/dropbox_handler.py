@@ -57,7 +57,7 @@ def get_next_file(self):
     else:
         # fallback (important if one type empty)
         selected = random.choice(images or videos)
-
+    actual_type = self.detect_media_type(selected.name)
     self.logger.info(
         f"Selected {media_type}: {selected.name} | "
         f"Images={len(images)}, Videos={len(videos)}"
