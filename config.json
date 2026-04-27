@@ -1,7 +1,7 @@
 ﻿{
   "dropbox": {
     "source_folder": "/instagram",
-    "failed_folder": "/failed"
+    "failed_folder": "/failedins"
   },
   "caption_limit": 2200,
   "retry_count": 3,
