@@ -18,12 +18,30 @@ logger = setup_logging()
 
 
 def safe_trim_caption(text: str, limit: int) -> str:
-    normalized = " ".join(str(text).split())
+    normalized = _normalize_caption_spacing(text)
     if len(normalized) <= limit:
         return normalized
 
     logger.warning(f"Caption trimmed to {limit} characters")
-    return normalized[:limit].rsplit(" ", 1)[0]
+    trimmed = normalized[:limit].rstrip()
+    return trimmed.rsplit(" ", 1)[0] or trimmed
+
+
+def _normalize_caption_spacing(text: str) -> str:
+    lines = [" ".join(str(line).split()).strip() for line in str(text).splitlines()]
+    cleaned = []
+    previous_blank = False
+
+    for line in lines:
+        if not line:
+            if not previous_blank and cleaned:
+                cleaned.append("")
+            previous_blank = True
+            continue
+        cleaned.append(line)
+        previous_blank = False
+
+    return "\n".join(cleaned).strip()
 
 
 def load_config():
@@ -122,10 +140,13 @@ def main():
         sys.exit(1)
 
     caption = safe_trim_caption(
-        caption_generator.generate(file_metadata.name, media_type),
+        caption_generator.generate(file_metadata.name, media_type, "instagram"),
         caption_limit,
     )
-    threads_caption = safe_trim_caption(caption, threads_caption_limit)
+    threads_caption = safe_trim_caption(
+        caption_generator.generate(file_metadata.name, media_type, "threads"),
+        threads_caption_limit,
+    )
 
     try:
         instagram_method = instagram.post_video if media_type == "video" else instagram.post_image
