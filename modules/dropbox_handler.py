@@ -1,6 +1,5 @@
 import logging
 import os
-import random
 
 import dropbox
 from dropbox.exceptions import ApiError
@@ -32,50 +31,28 @@ class DropboxHandler:
         if not text_folder:
             return None
 
-        files = self._list_files(text_folder)
-        text_files = [
-            entry for entry in files
+        files = [
+            entry
+            for entry in self._list_files(text_folder)
             if self.detect_file_type(entry.name) == "text"
         ]
-        if not text_files:
+        if not files:
             return None
 
-        selected = sorted(text_files, key=lambda entry: entry.name.lower())[0]
-        self.logger.info(f"Selected text file: {selected.name}")
-        return selected
+        files.sort(key=lambda item: (getattr(item, "server_modified", None), item.name.lower()))
+        return files[0]
 
     def get_next_file(self):
-        files = self._list_files(self.conf["source_folder"])
-
-        images = []
-        videos = []
-
-        for entry in files:
-            media_type = self.detect_media_type(entry.name)
-            if media_type == "image":
-                images.append(entry)
-            elif media_type == "video":
-                videos.append(entry)
-
-        if not images and not videos:
-            self.logger.warning("No valid media files found")
+        files = [
+            entry
+            for entry in self._list_files(self.conf["source_folder"])
+            if self.detect_media_type(entry.name) in {"image", "video"}
+        ]
+        if not files:
             return None
 
-        media_type = random.choices(["image", "video"], weights=[20, 80])[0]
-
-        if media_type == "image" and images:
-            selected = random.choice(images)
-        elif media_type == "video" and videos:
-            selected = random.choice(videos)
-        else:
-            selected = random.choice(images or videos)
-
-        actual_type = self.detect_media_type(selected.name)
-        self.logger.info(
-            f"Selected {actual_type}: {selected.name} | "
-            f"Images={len(images)}, Videos={len(videos)}"
-        )
-        return selected
+        files.sort(key=lambda item: (getattr(item, "server_modified", None), item.name.lower()))
+        return files[0]
 
     def detect_file_type(self, filename):
         extension = os.path.splitext(filename)[1].lower()
@@ -88,31 +65,32 @@ class DropboxHandler:
         return None
 
     def detect_media_type(self, filename):
-        file_type = self.detect_file_type(filename)
-        return file_type if file_type in {"image", "video"} else None
+        extension = os.path.splitext(filename)[1].lower()
+        if extension in self.IMAGE_EXTENSIONS:
+            return "image"
+        if extension in self.VIDEO_EXTENSIONS:
+            return "video"
+        return None
 
     def _list_files(self, path):
         try:
             client = self._get_client()
             results = client.files_list_folder(path)
-
             files = [
-                entry for entry in results.entries
+                entry
+                for entry in results.entries
                 if isinstance(entry, dropbox.files.FileMetadata)
             ]
 
             while results.has_more:
                 results = client.files_list_folder_continue(results.cursor)
                 files.extend(
-                    entry for entry in results.entries
+                    entry
+                    for entry in results.entries
                     if isinstance(entry, dropbox.files.FileMetadata)
                 )
 
             return files
-        except ApiError as error:
-            if "not_found" in str(error):
-                self.logger.info(f"Dropbox folder not found, skipping: {path}")
-                return []
         except Exception as error:
             self.logger.error(f"Dropbox list error ({path}): {error}")
             return []
@@ -150,11 +128,7 @@ class DropboxHandler:
 
         try:
             self._ensure_folder(failed_folder)
-            client.files_move_v2(
-                file_metadata.path_lower,
-                destination,
-                autorename=True,
-            )
+            client.files_move_v2(file_metadata.path_lower, destination, autorename=True)
             self.logger.warning(f"Moved failed file to {destination}")
         except Exception as error:
             self.logger.error(f"Move to failed error: {error}")

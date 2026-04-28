@@ -1,7 +1,6 @@
 import logging
 import os
 import time
-from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -12,6 +11,9 @@ class InstagramPoster:
         self.ig_id = os.getenv("IG_ID")
         self.token = os.getenv("META_TOKEN")
         self.base_url = f"https://graph.facebook.com/v18.0/{self.ig_id}"
+        self.processing_wait_seconds = int(os.getenv("IG_REEL_STATUS_WAIT_TIME", "10"))
+        self.processing_max_attempts = int(os.getenv("IG_REEL_STATUS_RETRIES", "30"))
+        self.publish_delay_seconds = int(os.getenv("IG_PUBLISH_DELAY_AFTER_FINISHED", "15"))
 
     def post_video(self, video_url, caption):
         return self._create_publish_container(video_url, caption, "VIDEO")
@@ -29,11 +31,12 @@ class InstagramPoster:
 
         if media_type == "VIDEO":
             payload["video_url"] = media_url
-            payload["share_to_feed"] = "true"
+            payload["share_to_feed"] = "false"
         else:
             payload["image_url"] = media_url
 
         self.logger.info(f"IG: sending {media_type.lower()} URL to Meta")
+        self.logger.info(f"IG create URL: {url}")
 
         try:
             response = requests.post(url, data=payload, timeout=60)
@@ -49,11 +52,14 @@ class InstagramPoster:
                 self._wait_for_video_processing(creation_id)
 
             publish_url = f"{self.base_url}/media_publish"
+            self.logger.info("IG: publishing media")
             publish_response = requests.post(
                 publish_url,
                 data={"creation_id": creation_id, "access_token": self.token},
                 timeout=60,
             )
+
+            self.logger.info(f"IG publish response code: {publish_response.status_code}")
 
             if publish_response.status_code != 200:
                 raise Exception(f"IG publish failed: {publish_response.text}")
@@ -69,13 +75,19 @@ class InstagramPoster:
 
     def _wait_for_video_processing(self, creation_id):
         self.logger.info("IG: waiting for reel processing")
+        self.logger.info(
+            "IG poll config: %ss interval, %s max attempts",
+            self.processing_wait_seconds,
+            self.processing_max_attempts,
+        )
         status = "IN_PROGRESS"
-        attempts = 0
-        max_attempts = 20
 
-        while status != "FINISHED" and attempts < max_attempts:
-            time.sleep(5)
-            attempts += 1
+        for attempt in range(1, self.processing_max_attempts + 1):
+            self.logger.info(
+                "IG poll attempt %s/%s",
+                attempt,
+                self.processing_max_attempts,
+            )
 
             status_response = requests.get(
                 f"https://graph.facebook.com/v18.0/{creation_id}",
@@ -85,66 +97,35 @@ class InstagramPoster:
 
             if status_response.status_code != 200:
                 self.logger.warning(f"IG poll error: {status_response.text}")
+                if attempt < self.processing_max_attempts:
+                    self.logger.info(
+                        "IG: waiting %ss before next status check",
+                        self.processing_wait_seconds,
+                    )
+                    time.sleep(self.processing_wait_seconds)
                 continue
 
             status = status_response.json().get("status_code", "ERROR")
-            self.logger.info(f"IG poll attempt {attempts}: {status}")
+            self.logger.info(f"IG poll status: {status}")
 
             if status == "ERROR":
                 raise Exception("IG video processing failed")
 
-        if status != "FINISHED":
-            raise Exception("IG video processing timeout")
+            if status == "FINISHED":
+                self.logger.info("IG: reel processing finished")
+                if self.publish_delay_seconds > 0:
+                    self.logger.info(
+                        "IG: waiting %ss before publish",
+                        self.publish_delay_seconds,
+                    )
+                    time.sleep(self.publish_delay_seconds)
+                return
 
-    def verify_recent_post(self, caption, media_type, lookback_minutes=10, limit=10):
-        cutoff = datetime.now(timezone.utc) - timedelta(minutes=lookback_minutes)
-        normalized_caption = self._normalize_caption(caption)
-        url = f"{self.base_url}/media"
-        params = {
-            "fields": "id,caption,media_type,timestamp",
-            "limit": limit,
-            "access_token": self.token,
-        }
+            if attempt < self.processing_max_attempts:
+                self.logger.info(
+                    "IG: waiting %ss before next status check",
+                    self.processing_wait_seconds,
+                )
+                time.sleep(self.processing_wait_seconds)
 
-        try:
-            response = requests.get(url, params=params, timeout=30)
-            if response.status_code != 200:
-                self.logger.warning(f"IG verify error: {response.text}")
-                return False
-
-            for item in response.json().get("data", []):
-                if self._normalize_caption(item.get("caption", "")) != normalized_caption:
-                    continue
-                if not self._media_type_matches(media_type, item.get("media_type", "")):
-                    continue
-                if not self._is_recent_timestamp(item.get("timestamp"), cutoff):
-                    continue
-
-                self.logger.info(f"IG verified recent live post: {item.get('id')}")
-                return True
-        except Exception as error:
-            self.logger.warning(f"IG verify exception: {error}")
-
-        return False
-
-    def _normalize_caption(self, text):
-        return " ".join(str(text or "").split()).strip()
-
-    def _media_type_matches(self, expected_media_type, actual_media_type):
-        normalized_actual = str(actual_media_type or "").upper()
-        if expected_media_type == "video":
-            return normalized_actual in {"VIDEO", "REEL", "REELS", "CAROUSEL_ALBUM"}
-        return normalized_actual in {"IMAGE", "CAROUSEL_ALBUM"}
-
-    def _is_recent_timestamp(self, timestamp_value, cutoff):
-        if not timestamp_value:
-            return False
-
-        try:
-            normalized = str(timestamp_value).replace("Z", "+00:00")
-            timestamp = datetime.fromisoformat(normalized)
-            if timestamp.tzinfo is None:
-                timestamp = timestamp.replace(tzinfo=timezone.utc)
-            return timestamp >= cutoff
-        except Exception:
-            return False
+        raise Exception("IG video processing timeout")
