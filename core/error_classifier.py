@@ -14,7 +14,19 @@ class ErrorClassifier:
             return "SKIP"
 
         retry_codes = [429, 500, 502, 503, 504]
-        retry_triggers = ["timeout", "connection reset", "try again", "rate limit"]
+        retry_triggers = [
+            "timeout",
+            "connection reset",
+            "try again",
+            "rate limit",
+            "ig video processing failed",
+            "ig video processing timeout",
+            "threads processing error",
+            "threads processing timeout",
+            "application request limit reached",
+            "generic internal error",
+            "action is blocked",
+        ]
         if code in retry_codes or any(x in msg for x in retry_triggers):
             return "RETRY"
 
