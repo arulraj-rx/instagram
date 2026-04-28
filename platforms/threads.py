@@ -89,7 +89,7 @@ class ThreadsPoster:
     def _wait_for_container(self, creation_id):
         url = f"{self.api_host}/{creation_id}"
         params = {
-            "fields": "id,status,error,error_message",
+            "fields": "id,status",
             "access_token": self.token,
         }
         last_status = None
@@ -106,12 +106,7 @@ class ThreadsPoster:
                 return True
 
             if status in {"ERROR", "EXPIRED", "FAILED"}:
-                details = (
-                    data.get("error_message")
-                    or data.get("error")
-                    or f"status={status}"
-                )
-                raise Exception(f"Threads Processing Error: {details}")
+                raise Exception(f"Threads Processing Error: status={status}")
 
         raise Exception(f"Threads processing timeout: last_status={last_status or 'UNKNOWN'}")
 

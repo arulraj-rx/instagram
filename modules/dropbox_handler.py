@@ -91,6 +91,10 @@ class DropboxHandler:
                 )
 
             return files
+        except ApiError as error:
+            if "not_found" in str(error):
+                self.logger.info(f"Dropbox folder not found, skipping: {path}")
+                return []
         except Exception as error:
             self.logger.error(f"Dropbox list error ({path}): {error}")
             return []
