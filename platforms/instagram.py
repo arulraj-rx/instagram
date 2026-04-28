@@ -31,7 +31,7 @@ class InstagramPoster:
 
         if media_type == "VIDEO":
             payload["video_url"] = media_url
-            payload["share_to_feed"] = "false"
+            payload["share_to_feed"] = "true"
         else:
             payload["image_url"] = media_url
 
