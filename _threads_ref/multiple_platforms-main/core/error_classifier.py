@@ -13,22 +13,24 @@ class ErrorClassifier:
         # 2. MEDIA ERRORS (Skip File)
         # 413: File too large, 415: Bad format, 422: Processing error
         media_codes = [413, 415, 422]
-        media_triggers = ["payload too large", "unsupported media", "aspect ratio", "invalid format"]
+        media_triggers = [
+            "payload too large",
+            "unsupported media",
+            "aspect ratio",
+            "invalid format",
+            "media download has failed",
+            "media uri doesn't meet our requirements",
+            "the media could not be fetched from this uri",
+            "failed_downloading_video",
+            "failed_processing_video",
+        ]
         if code in media_codes or any(x in msg for x in media_triggers):
             return "SKIP"
 
         # 3. TEMPORARY ERRORS (Retry)
         # 429: Rate limit, 5xx: Server glitch
         retry_codes = [429, 500, 502, 503, 504]
-        retry_triggers = [
-            "timeout",
-            "connection reset",
-            "try again",
-            "rate limit",
-            "processing failed",
-            "processing error",
-            "publish confirmation timeout",
-        ]
+        retry_triggers = ["timeout", "connection reset", "try again", "rate limit"]
         if code in retry_codes or any(x in msg for x in retry_triggers):
             return "RETRY"
 

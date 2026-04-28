@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import os
 import time
 
@@ -6,11 +6,14 @@ import requests
 
 
 class InstagramPoster:
-    def __init__(self):
+    def __init__(self, settings=None):
+        settings = settings or {}
         self.logger = logging.getLogger(__name__)
         self.ig_id = os.getenv("IG_ID")
         self.token = os.getenv("META_TOKEN")
         self.base_url = f"https://graph.facebook.com/v18.0/{self.ig_id}"
+        self.poll_interval = int(settings.get("instagram_poll_interval", 10))
+        self.poll_attempts = int(settings.get("instagram_poll_attempts", 30))
 
     def post_video(self, video_url, caption):
         return self._create_publish_container(video_url, caption, "VIDEO")
@@ -68,17 +71,17 @@ class InstagramPoster:
 
     def _wait_for_video_processing(self, creation_id):
         self.logger.info("IG: waiting for reel processing")
-        status = "IN_PROGRESS"
-        attempts = 0
-        max_attempts = 20
+        last_status = None
 
-        while status != "FINISHED" and attempts < max_attempts:
-            time.sleep(5)
-            attempts += 1
+        for attempt in range(1, self.poll_attempts + 1):
+            time.sleep(self.poll_interval)
 
             status_response = requests.get(
                 f"https://graph.facebook.com/v18.0/{creation_id}",
-                params={"fields": "status_code", "access_token": self.token},
+                params={
+                    "fields": "status_code,status,error_message",
+                    "access_token": self.token,
+                },
                 timeout=30,
             )
 
@@ -86,12 +89,16 @@ class InstagramPoster:
                 self.logger.warning(f"IG poll error: {status_response.text}")
                 continue
 
-            status = status_response.json().get("status_code", "ERROR")
-            self.logger.info(f"IG poll attempt {attempts}: {status}")
+            data = status_response.json()
+            status = data.get("status_code") or data.get("status") or "UNKNOWN"
+            last_status = status
+            self.logger.info(f"IG poll attempt {attempt}: {status}")
 
-            if status == "ERROR":
-                raise Exception("IG video processing failed")
+            if status in {"FINISHED", "PUBLISHED"}:
+                return
 
-        if status != "FINISHED":
-            raise Exception("IG video processing timeout")
+            if status in {"ERROR", "EXPIRED", "FAILED"}:
+                detail = data.get("error_message") or f"status={status}"
+                raise Exception(f"IG video processing failed: {detail}")
 
+        raise Exception(f"IG video processing timeout: last_status={last_status or 'UNKNOWN'}")

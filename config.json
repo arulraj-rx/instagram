@@ -1,9 +1,18 @@
 ﻿{
   "dropbox": {
     "source_folder": "/instagram",
+    "threads_text_folder": "/threads_text",
     "failed_folder": "/failedins"
   },
   "caption_limit": 2200,
+  "threads_caption_limit": 500,
+  "threads_text_limit": 500,
   "retry_count": 3,
+  "retry_delay": 5,
+  "instagram_poll_interval": 10,
+  "instagram_poll_attempts": 30,
+  "threads_poll_interval": 10,
+  "threads_processing_poll_attempts": 24,
+  "threads_publish_poll_attempts": 12,
   "fixed_hashtag": "#arul9x"
 }

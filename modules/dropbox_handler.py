@@ -7,6 +7,7 @@ from dropbox.exceptions import ApiError
 
 
 class DropboxHandler:
+    TEXT_EXTENSIONS = {".txt"}
     IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
     VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 
@@ -26,7 +27,23 @@ class DropboxHandler:
             self.logger.info("Dropbox client initialized")
         return self.client
 
-    # ✅ FIXED: inside class
+    def get_next_text_file(self):
+        text_folder = self.conf.get("threads_text_folder")
+        if not text_folder:
+            return None
+
+        files = self._list_files(text_folder)
+        text_files = [
+            entry for entry in files
+            if self.detect_file_type(entry.name) == "text"
+        ]
+        if not text_files:
+            return None
+
+        selected = sorted(text_files, key=lambda entry: entry.name.lower())[0]
+        self.logger.info(f"Selected text file: {selected.name}")
+        return selected
+
     def get_next_file(self):
         files = self._list_files(self.conf["source_folder"])
 
@@ -44,11 +61,7 @@ class DropboxHandler:
             self.logger.warning("No valid media files found")
             return None
 
-        # 🎯 60% image / 40% video
-        media_type = random.choices(
-            ["image", "video"],
-            weights=[20, 80]
-        )[0]
+        media_type = random.choices(["image", "video"], weights=[20, 80])[0]
 
         if media_type == "image" and images:
             selected = random.choice(images)
@@ -58,22 +71,25 @@ class DropboxHandler:
             selected = random.choice(images or videos)
 
         actual_type = self.detect_media_type(selected.name)
-
         self.logger.info(
             f"Selected {actual_type}: {selected.name} | "
             f"Images={len(images)}, Videos={len(videos)}"
         )
-
         return selected
 
-    # ✅ FIXED: proper indentation
-    def detect_media_type(self, filename):
+    def detect_file_type(self, filename):
         extension = os.path.splitext(filename)[1].lower()
+        if extension in self.TEXT_EXTENSIONS:
+            return "text"
         if extension in self.IMAGE_EXTENSIONS:
             return "image"
         if extension in self.VIDEO_EXTENSIONS:
             return "video"
         return None
+
+    def detect_media_type(self, filename):
+        file_type = self.detect_file_type(filename)
+        return file_type if file_type in {"image", "video"} else None
 
     def _list_files(self, path):
         try:
@@ -93,7 +109,6 @@ class DropboxHandler:
                 )
 
             return files
-
         except Exception as error:
             self.logger.error(f"Dropbox list error ({path}): {error}")
             return []
@@ -104,7 +119,6 @@ class DropboxHandler:
             local_path = os.path.abspath(f"temp_{file_metadata.name}")
             client.files_download_to_file(local_path, file_metadata.path_lower)
             return local_path
-
         except Exception as error:
             self.logger.error(f"Download failed: {error}")
             return None
@@ -113,7 +127,6 @@ class DropboxHandler:
         try:
             client = self._get_client()
             return client.files_get_temporary_link(file_metadata.path_lower).link
-
         except Exception as error:
             self.logger.error(f"Temporary link failed: {error}")
             return None
@@ -123,7 +136,6 @@ class DropboxHandler:
             client = self._get_client()
             client.files_delete_v2(file_metadata.path_lower)
             self.logger.info(f"Deleted {file_metadata.name} from Dropbox")
-
         except Exception as error:
             self.logger.error(f"Delete failed: {error}")
 
@@ -137,10 +149,9 @@ class DropboxHandler:
             client.files_move_v2(
                 file_metadata.path_lower,
                 destination,
-                autorename=True
+                autorename=True,
             )
             self.logger.warning(f"Moved failed file to {destination}")
-
         except Exception as error:
             self.logger.error(f"Move to failed error: {error}")
 
@@ -153,7 +164,6 @@ class DropboxHandler:
             current = f"{current}/{segment}"
             try:
                 client.files_create_folder_v2(current)
-
             except ApiError as error:
                 if error.error.is_path() and error.error.get_path().is_conflict():
                     continue
