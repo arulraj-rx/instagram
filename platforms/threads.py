@@ -89,7 +89,7 @@ class ThreadsPoster:
     def _wait_for_container(self, creation_id):
         url = f"{self.api_host}/{creation_id}"
         params = {
-            "fields": "id,status,status_code,error,error_message",
+            "fields": "id,status,error,error_message",
             "access_token": self.token,
         }
         last_status = None
@@ -98,7 +98,7 @@ class ThreadsPoster:
             time.sleep(self.poll_interval)
             response = self._get(url, params, "Threads status check failed")
             data = response.json()
-            status = data.get("status") or data.get("status_code") or "UNKNOWN"
+            status = data.get("status") or "UNKNOWN"
             last_status = status
             self.logger.info(f"THREADS processing attempt {attempt}: {status}")
 

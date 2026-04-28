@@ -134,12 +134,8 @@ def main():
         if instagram_result is not True:
             raise Exception("Instagram upload returned an unexpected result")
 
-        threads_url = dropbox_handler.get_temp_link(file_metadata)
-        if not threads_url:
-            raise Exception("Could not create Dropbox temporary link for Threads")
-
         threads_method = threads.post_video if media_type == "video" else threads.post_image
-        threads_result = retry_engine.execute(threads_method, threads_url, threads_caption)
+        threads_result = retry_engine.execute(threads_method, public_url, threads_caption)
 
         if threads_result is True:
             dropbox_handler.delete_file(file_metadata)
