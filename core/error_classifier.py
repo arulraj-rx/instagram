@@ -1,8 +1,13 @@
 class ErrorClassifier:
     @staticmethod
-    def classify(error_msg, status_code=None):
+    def classify(error_msg, status_code=None, error_code=None, error_subcode=None, is_transient=None):
         msg = str(error_msg).lower()
         code = int(status_code) if status_code else None
+        meta_code = int(error_code) if error_code not in (None, "") else None
+        meta_subcode = int(error_subcode) if error_subcode not in (None, "") else None
+
+        if is_transient is True:
+            return "RETRY"
 
         # 1. AUTH ERRORS (Refresh Token)
         # 401 is the standard "Unauthorized" signal
@@ -28,8 +33,17 @@ class ErrorClassifier:
             "processing failed",
             "processing error",
             "publish confirmation timeout",
+            "application request limit reached",
+            "action is blocked",
         ]
-        if code in retry_codes or any(x in msg for x in retry_triggers):
+        retry_meta_codes = {4, 17, 32, 341, 613}
+        retry_meta_subcodes = {2207051}
+        if (
+            code in retry_codes
+            or meta_code in retry_meta_codes
+            or meta_subcode in retry_meta_subcodes
+            or any(x in msg for x in retry_triggers)
+        ):
             return "RETRY"
 
         # 4. PERMANENT ERRORS (Stop)

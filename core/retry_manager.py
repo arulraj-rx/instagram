@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from .error_classifier import ErrorClassifier
+from .meta_api import parse_meta_error
 
 
 def backoff_with_full_jitter(attempt, base=2, cap=900):
@@ -47,10 +48,20 @@ class SmartRetry:
             try:
                 return func(*args, **kwargs)
             except Exception as e:
+                if getattr(e, "disable_outer_retry", False):
+                    raise
+
                 response = getattr(e, "response", None)
                 status_code = getattr(e, "status_code", None) or getattr(response, "status_code", None)
                 headers = getattr(e, "headers", None) or getattr(response, "headers", {}) or {}
-                action = ErrorClassifier.classify(str(e), status_code=status_code)
+                meta_error = parse_meta_error(response)
+                action = ErrorClassifier.classify(
+                    str(e),
+                    status_code=status_code,
+                    error_code=meta_error.get("code"),
+                    error_subcode=meta_error.get("subcode"),
+                    is_transient=meta_error.get("is_transient"),
+                )
 
                 if action == "STOP":
                     self.logger.error(f"Permanent error: {e}. Stopping.")
@@ -69,11 +80,11 @@ class SmartRetry:
                     raise
 
                 retry_after = self._parse_retry_after(headers.get("Retry-After"))
-                if status_code == 429:
+                if status_code == 429 or meta_error.get("code") in {4, 17, 32, 341, 613}:
                     wait_seconds = retry_after if retry_after is not None else 30
                     wait_seconds = min(wait_seconds, self.max_backoff)
                     self.logger.warning(
-                        f"Rate limit hit (429). Sleeping for {wait_seconds}s before retry..."
+                        f"Rate limit hit. Sleeping for {wait_seconds}s before retry..."
                     )
                     time.sleep(wait_seconds + 1)
                     continue
