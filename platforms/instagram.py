@@ -142,7 +142,7 @@ class InstagramPoster:
             status_response = requests.get(
                 f"https://graph.facebook.com/{self.api_version}/{creation_id}",
                 params={
-                    "fields": "status_code,status,error_message",
+                    "fields": "status_code",
                     "access_token": self.token,
                 },
                 timeout=30,
@@ -154,7 +154,7 @@ class InstagramPoster:
                 continue
 
             data = status_response.json()
-            status = data.get("status_code") or data.get("status") or "UNKNOWN"
+            status = data.get("status_code") or "UNKNOWN"
             last_status = status
             self.logger.info(f"IG poll attempt {attempt}: {status}")
 
@@ -162,8 +162,7 @@ class InstagramPoster:
                 return
 
             if status in {"ERROR", "EXPIRED", "FAILED"}:
-                detail = data.get("error_message") or f"status={status}"
-                raise Exception(f"IG video processing failed: {detail}")
+                raise Exception(f"IG video processing failed: status={status}")
 
         raise Exception(f"IG video processing timeout: last_status={last_status or 'UNKNOWN'}")
 

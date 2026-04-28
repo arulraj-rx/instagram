@@ -49,7 +49,13 @@ class ErrorClassifier:
         # 4. PERMANENT ERRORS (Stop)
         # 400: Logic error, 403: Permission denied, 404: Missing endpoint
         stop_codes = [400, 403, 404, 405]
-        if code in stop_codes or "forbidden" in msg:
+        stop_triggers = [
+            "tried accessing nonexisting field",
+            "unsupported get request",
+            "unsupported post request",
+            "(#100)",
+        ]
+        if code in stop_codes or "forbidden" in msg or any(x in msg for x in stop_triggers):
             return "STOP"
 
         # Default fallback
