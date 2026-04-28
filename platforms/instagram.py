@@ -1,10 +1,12 @@
 import logging
 import os
 import time
+from datetime import datetime, timedelta, timezone
 
 import requests
 from core.meta_api import (
     build_meta_error_message,
+    parse_meta_error,
 )
 
 
@@ -61,7 +63,7 @@ class InstagramPoster:
             if media_type == "VIDEO":
                 self._wait_for_video_processing(creation_id)
 
-            return self._publish_creation_id(creation_id)
+            return self._publish_creation_id(creation_id, caption, media_type)
         except requests.exceptions.Timeout:
             self.logger.error("IG connection timed out")
             raise Exception("Timeout")
@@ -69,7 +71,7 @@ class InstagramPoster:
             self.logger.error(f"IG error: {error}")
             raise
 
-    def _publish_creation_id(self, creation_id):
+    def _publish_creation_id(self, creation_id, caption, media_type):
         publish_url = f"{self.base_url}/media_publish"
         publish_response = requests.post(
             publish_url,
@@ -79,6 +81,16 @@ class InstagramPoster:
         self._log_usage_headers(publish_response, "IG publish")
 
         if publish_response.status_code != 200:
+            meta_error = parse_meta_error(publish_response)
+            if self._should_reconcile_publish_error(meta_error):
+                self.logger.warning(
+                    "IG publish returned an error; checking whether the post is already live"
+                )
+                if self._reconcile_recent_publish(caption, media_type):
+                    self.logger.warning(
+                        "IG publish reconciliation succeeded; treating the post as successful"
+                    )
+                    return True
             raise requests.HTTPError(
                 build_meta_error_message("IG publish failed", publish_response),
                 response=publish_response,
@@ -87,6 +99,13 @@ class InstagramPoster:
         media_id = publish_response.json()["id"]
         self.logger.info(f"IG published successfully: {media_id}")
         return self._confirm_media_exists(media_id)
+
+    def _should_reconcile_publish_error(self, meta_error):
+        return (
+            meta_error.get("code") in {4, -1}
+            or meta_error.get("subcode") in {2207051, 2207085}
+            or meta_error.get("is_transient") is True
+        )
 
     def _log_usage_headers(self, response, label):
         app_usage = response.headers.get("x-app-usage")
@@ -153,3 +172,62 @@ class InstagramPoster:
                 time.sleep(self.poll_interval)
 
         raise Exception("IG publish confirmation timeout")
+
+    def _reconcile_recent_publish(self, caption, media_type):
+        normalized_caption = self._normalize_caption(caption)
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
+        media_url = f"{self.base_url}/media"
+        params = {
+            "fields": "id,caption,media_type,timestamp",
+            "limit": 10,
+            "access_token": self.token,
+        }
+
+        for attempt in range(1, self.poll_attempts + 1):
+            response = requests.get(media_url, params=params, timeout=30)
+            self._log_usage_headers(response, f"IG reconcile attempt {attempt}")
+
+            if response.status_code == 200:
+                items = response.json().get("data", [])
+                for item in items:
+                    if not self._caption_matches(normalized_caption, item.get("caption", "")):
+                        continue
+                    if not self._media_type_matches(media_type, item.get("media_type", "")):
+                        continue
+                    if not self._is_recent_timestamp(item.get("timestamp"), cutoff):
+                        continue
+
+                    self.logger.info(
+                        f"IG reconcile matched live post: {item.get('id', 'UNKNOWN')}"
+                    )
+                    return True
+
+            if attempt < self.poll_attempts:
+                time.sleep(self.poll_interval)
+
+        return False
+
+    def _normalize_caption(self, text):
+        return " ".join(str(text or "").split()).strip()
+
+    def _caption_matches(self, expected, actual):
+        return self._normalize_caption(expected) == self._normalize_caption(actual)
+
+    def _media_type_matches(self, expected_media_type, actual_media_type):
+        normalized_actual = str(actual_media_type or "").upper()
+        if expected_media_type == "VIDEO":
+            return normalized_actual in {"VIDEO", "REEL", "REELS", "CAROUSEL_ALBUM"}
+        return normalized_actual in {"IMAGE", "CAROUSEL_ALBUM"}
+
+    def _is_recent_timestamp(self, timestamp_value, cutoff):
+        if not timestamp_value:
+            return False
+
+        try:
+            normalized = str(timestamp_value).replace("Z", "+00:00")
+            timestamp = datetime.fromisoformat(normalized)
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+            return timestamp >= cutoff
+        except Exception:
+            return False
