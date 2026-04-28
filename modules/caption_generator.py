@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 
 from groq import Groq
 
@@ -56,11 +57,11 @@ class CaptionGenerator:
             )
             raw_caption = completion.choices[0].message.content.strip()
             normalized = self._normalize_multiline_caption(raw_caption)
-            return self._append_fixed_hashtag(normalized)
+            return self._finalize_instagram_caption(normalized, clean_name)
         except Exception as error:
             self.logger.error(f"AI generation failed: {error}")
             fallback = self._normalize_multiline_caption(clean_name)
-            return self._append_fixed_hashtag(fallback)
+            return self._finalize_instagram_caption(fallback, clean_name)
 
     def _generate_threads_caption(self, clean_name, media_type):
         system_instruction = (
@@ -96,10 +97,12 @@ class CaptionGenerator:
                 max_tokens=400,
             )
             raw_caption = completion.choices[0].message.content.strip()
-            return self._normalize_multiline_caption(raw_caption)
+            normalized = self._normalize_multiline_caption(raw_caption)
+            return self._finalize_threads_caption(normalized, clean_name)
         except Exception as error:
             self.logger.error(f"Threads AI generation failed: {error}")
-            return self._normalize_multiline_caption(clean_name)
+            fallback = self._normalize_multiline_caption(clean_name)
+            return self._finalize_threads_caption(fallback, clean_name)
 
     def _clean_name(self, filename):
         return os.path.splitext(filename)[0].replace("_", " ").replace("-", " ").strip()
@@ -130,3 +133,86 @@ class CaptionGenerator:
 
         combined = f"{caption}\n\n{self.fixed_tag}".strip()
         return combined[: self.caption_limit].strip()
+
+    def _finalize_instagram_caption(self, caption, clean_name):
+        body, tags = self._split_body_and_hashtags(caption)
+        tags = self._ensure_hashtag_count(tags, clean_name, minimum=5, maximum=7)
+        joined_tags = " ".join(tags)
+        combined = f"{body}\n\n{joined_tags}".strip() if joined_tags else body.strip()
+        return self._append_fixed_hashtag(combined)
+
+    def _finalize_threads_caption(self, caption, clean_name):
+        body, tags = self._split_body_and_hashtags(caption)
+        tags = self._ensure_hashtag_count(tags, clean_name, minimum=1, maximum=1)
+        joined_tags = " ".join(tags[:1])
+        return f"{body}\n\n{joined_tags}".strip() if joined_tags else body.strip()
+
+    def _split_body_and_hashtags(self, caption):
+        lines = caption.splitlines()
+        body_lines = []
+        tag_parts = []
+
+        for line in lines:
+            hashtags = self._extract_hashtags(line)
+            cleaned_line = self._remove_hashtags_from_line(line).strip()
+            if cleaned_line:
+                body_lines.append(cleaned_line)
+            if hashtags:
+                tag_parts.extend(hashtags)
+
+        body = self._normalize_multiline_caption("\n".join(body_lines))
+        return body, self._dedupe_hashtags(tag_parts)
+
+    def _extract_hashtags(self, text):
+        return re.findall(r"#([A-Za-z0-9_]+)", str(text))
+
+    def _remove_hashtags_from_line(self, text):
+        return re.sub(r"(?:^|\s)#[A-Za-z0-9_]+", "", str(text)).strip()
+
+    def _dedupe_hashtags(self, tags):
+        deduped = []
+        seen = set()
+        for tag in tags:
+            normalized = self._normalize_hashtag(tag)
+            if not normalized:
+                continue
+            lowered = normalized.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            deduped.append(f"#{normalized}")
+        return deduped
+
+    def _ensure_hashtag_count(self, tags, clean_name, minimum, maximum):
+        deduped = self._dedupe_hashtags(tags)
+        fallback_tags = self._build_fallback_hashtags(clean_name)
+
+        for tag in fallback_tags:
+            if len(deduped) >= minimum:
+                break
+            lowered = tag.lower()
+            if lowered not in {item.lower() for item in deduped}:
+                deduped.append(tag)
+
+        if len(deduped) < minimum:
+            generic_tags = ["#love", "#life", "#quotes", "#motivation", "#feelings", "#thoughts", "#reels"]
+            for tag in generic_tags:
+                if len(deduped) >= minimum:
+                    break
+                if tag.lower() not in {item.lower() for item in deduped}:
+                    deduped.append(tag)
+
+        return deduped[:maximum]
+
+    def _build_fallback_hashtags(self, clean_name):
+        words = []
+        for raw_word in clean_name.split():
+            normalized = self._normalize_hashtag(raw_word)
+            if normalized and len(normalized) > 2:
+                words.append(f"#{normalized}")
+
+        return self._dedupe_hashtags(words)
+
+    def _normalize_hashtag(self, value):
+        cleaned = re.sub(r"[^A-Za-z0-9_]", "", str(value).lstrip("#"))
+        return cleaned[:30]
