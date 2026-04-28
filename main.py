@@ -51,7 +51,7 @@ def main():
     config = load_config()
     dropbox_handler = DropboxHandler(config["dropbox"])
     caption_generator = CaptionGenerator(config)
-    instagram = InstagramPoster(config)
+    instagram = InstagramPoster()
     threads = ThreadsPoster(config)
     caption_limit = int(config.get("caption_limit", 2200))
     threads_text_limit = int(config.get("threads_text_limit", 500))
