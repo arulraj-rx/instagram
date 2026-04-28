@@ -9,7 +9,7 @@ class CaptionGenerator:
     def __init__(self, config):
         self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
         self.logger = logging.getLogger(__name__)
-        self.fixed_tag = str(config.get("fixed_hashtag", "#arul9x")).strip()
+        self.fixed_tag = str(config.get("fixed_hashtag", "#whystaystill")).strip()
         self.caption_limit = int(config.get("caption_limit", 2200))
         self.threads_caption_limit = int(
             config.get("threads_caption_limit", self.caption_limit)
@@ -26,9 +26,9 @@ class CaptionGenerator:
     def _generate_instagram_caption(self, clean_name, media_type):
         system_instruction = (
             "You write Instagram captions from filenames. "
-            "Write in 3 short sections with a blank line between sections. "
-            "Use natural expressive emojis based on the emotion of the post. "
-            "Use around 5 to 10 emojis naturally, and never exceed 40 emojis total. "
+            "Write in 3 short sections with a blank linespace between sections. "
+            "Use emojis based on the emotion of the post. "
+            "Use around 10 to 15 emojis naturally, and never exceed 40 emojis total. "
             "End with 5 to 7 relevant hashtags on the final line. "
             "Do not add quotation marks. "
             f"Do not add the fixed hashtag {self.fixed_tag}; it will be appended separately."
@@ -66,8 +66,8 @@ class CaptionGenerator:
     def _generate_threads_caption(self, clean_name, media_type):
         system_instruction = (
             "You write Threads captions from filenames. "
-            "Write in 3 or 4 short lines or short paragraphs with blank lines between them. "
-            "Use emotional emojis that fit the post. "
+            "Write in 3 or 4 short lines or short paragraphs with blank linespace between them. "
+            "Use emojis that fit the post. "
             "Use around 5 to 10 emojis naturally, and never exceed 40 emojis total. "
             "End with exactly 1 relevant hashtag on the final line. "
             "Do not use the fixed hashtag from Instagram. "
