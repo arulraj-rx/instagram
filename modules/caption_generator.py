@@ -23,12 +23,12 @@ class CaptionGenerator:
         return self._generate_instagram_caption(clean_name, media_type)
 
     def _generate_instagram_caption(self, clean_name, media_type):
-        hashtag_target = 4 if media_type == "video" else 3
         system_instruction = (
             "You write Instagram captions from filenames. "
             "Write in 3 short sections with a blank line between sections. "
-            "Use natural expressive emojis based on the emotion of the post, maximum 10 emojis total. "
-            f"End with exactly {hashtag_target} relevant hashtags on the final line. "
+            "Use natural expressive emojis based on the emotion of the post. "
+            "Use around 5 to 10 emojis naturally, and never exceed 40 emojis total. "
+            "End with 5 to 7 relevant hashtags on the final line. "
             "Do not add quotation marks. "
             f"Do not add the fixed hashtag {self.fixed_tag}; it will be appended separately."
         )
@@ -66,8 +66,10 @@ class CaptionGenerator:
         system_instruction = (
             "You write Threads captions from filenames. "
             "Write in 3 or 4 short lines or short paragraphs with blank lines between them. "
-            "Use emotional emojis that fit the post, maximum 10 emojis total. "
-            "Do not use hashtags at all. "
+            "Use emotional emojis that fit the post. "
+            "Use around 5 to 10 emojis naturally, and never exceed 40 emojis total. "
+            "End with exactly 1 relevant hashtag on the final line. "
+            "Do not use the fixed hashtag from Instagram. "
             "Do not add quotation marks. "
             "Make it feel human, reflective, and suited for Threads."
         )
