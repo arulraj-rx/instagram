@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -94,3 +95,56 @@ class InstagramPoster:
 
         if status != "FINISHED":
             raise Exception("IG video processing timeout")
+
+    def verify_recent_post(self, caption, media_type, lookback_minutes=10, limit=10):
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=lookback_minutes)
+        normalized_caption = self._normalize_caption(caption)
+        url = f"{self.base_url}/media"
+        params = {
+            "fields": "id,caption,media_type,timestamp",
+            "limit": limit,
+            "access_token": self.token,
+        }
+
+        try:
+            response = requests.get(url, params=params, timeout=30)
+            if response.status_code != 200:
+                self.logger.warning(f"IG verify error: {response.text}")
+                return False
+
+            for item in response.json().get("data", []):
+                if self._normalize_caption(item.get("caption", "")) != normalized_caption:
+                    continue
+                if not self._media_type_matches(media_type, item.get("media_type", "")):
+                    continue
+                if not self._is_recent_timestamp(item.get("timestamp"), cutoff):
+                    continue
+
+                self.logger.info(f"IG verified recent live post: {item.get('id')}")
+                return True
+        except Exception as error:
+            self.logger.warning(f"IG verify exception: {error}")
+
+        return False
+
+    def _normalize_caption(self, text):
+        return " ".join(str(text or "").split()).strip()
+
+    def _media_type_matches(self, expected_media_type, actual_media_type):
+        normalized_actual = str(actual_media_type or "").upper()
+        if expected_media_type == "video":
+            return normalized_actual in {"VIDEO", "REEL", "REELS", "CAROUSEL_ALBUM"}
+        return normalized_actual in {"IMAGE", "CAROUSEL_ALBUM"}
+
+    def _is_recent_timestamp(self, timestamp_value, cutoff):
+        if not timestamp_value:
+            return False
+
+        try:
+            normalized = str(timestamp_value).replace("Z", "+00:00")
+            timestamp = datetime.fromisoformat(normalized)
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
+            return timestamp >= cutoff
+        except Exception:
+            return False

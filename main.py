@@ -128,12 +128,21 @@ def main():
         instagram_method = instagram.post_video if media_type == "video" else instagram.post_image
         threads_method = threads.post_video if media_type == "video" else threads.post_image
 
-        instagram_result = post_with_fresh_link(
-            instagram_method,
-            dropbox_handler,
-            file_metadata,
-            caption,
-        )
+        try:
+            instagram_result = post_with_fresh_link(
+                instagram_method,
+                dropbox_handler,
+                file_metadata,
+                caption,
+            )
+        except Exception as exc:
+            logger.warning(f"Instagram raised publish error, verifying live post: {exc}")
+            if instagram.verify_recent_post(caption, media_type):
+                logger.warning("Instagram post is already live, continuing workflow")
+                instagram_result = True
+            else:
+                raise
+
         threads_result = post_with_fresh_link(
             threads_method,
             dropbox_handler,
