@@ -4,9 +4,7 @@ import time
 
 import requests
 from core.meta_api import (
-    MetaPublishRetryExhausted,
     build_meta_error_message,
-    parse_meta_error,
 )
 
 
@@ -32,8 +30,6 @@ class ThreadsPoster:
             1,
             self.publish_timeout_seconds // max(1, self.poll_interval),
         )
-        self.publish_retry_attempts = int(settings.get("meta_publish_retry_attempts", 2))
-        self.publish_retry_delay = int(settings.get("meta_publish_retry_delay", 60))
 
     def post_image(self, image_url, caption):
         return self._create_media_post(image_url, caption, "IMAGE")
@@ -122,45 +118,17 @@ class ThreadsPoster:
     def _publish_container(self, creation_id):
         url = f"{self.base_url}/threads_publish"
         payload = {"creation_id": creation_id, "access_token": self.token}
-        last_response = None
+        response = requests.post(url, data=payload, timeout=60)
+        if response.status_code != 200:
+            raise requests.HTTPError(
+                build_meta_error_message("Threads publish failed", response),
+                response=response,
+            )
 
-        for attempt in range(1, self.publish_retry_attempts + 1):
-            response = requests.post(url, data=payload, timeout=60)
-            if response.status_code == 200:
-                thread_id = response.json().get("id")
-                if not thread_id:
-                    raise Exception("Threads publish failed: missing thread id")
-                return self._poll_thread(thread_id)
-
-            last_response = response
-            meta_error = parse_meta_error(response)
-            message = build_meta_error_message("Threads publish failed", response)
-            retryable = self._is_retryable_publish_error(meta_error)
-
-            if retryable and attempt < self.publish_retry_attempts:
-                wait_seconds = self.publish_retry_delay * attempt
-                self.logger.warning(
-                    f"{message}. Reusing same Threads container and retrying publish in {wait_seconds}s"
-                )
-                time.sleep(wait_seconds)
-                continue
-
-            if retryable:
-                raise MetaPublishRetryExhausted(message, response=response)
-
-            raise requests.HTTPError(message, response=response)
-
-        raise MetaPublishRetryExhausted(
-            "Threads publish failed after internal retries",
-            response=last_response,
-        )
-
-    def _is_retryable_publish_error(self, meta_error):
-        return (
-            meta_error.get("is_transient") is True
-            or meta_error.get("code") in {4, 17, 32, 341, 613}
-            or meta_error.get("subcode") in {2207051}
-        )
+        thread_id = response.json().get("id")
+        if not thread_id:
+            raise Exception("Threads publish failed: missing thread id")
+        return self._poll_thread(thread_id)
 
     def _poll_thread(self, thread_id):
         url = f"{self.api_host}/{thread_id}"

@@ -4,9 +4,7 @@ import time
 
 import requests
 from core.meta_api import (
-    MetaPublishRetryExhausted,
     build_meta_error_message,
-    parse_meta_error,
 )
 
 
@@ -23,8 +21,6 @@ class InstagramPoster:
             settings.get("instagram_poll_timeout_seconds", 50)
         )
         self.poll_attempts = max(1, self.poll_timeout_seconds // max(1, self.poll_interval))
-        self.publish_retry_attempts = int(settings.get("meta_publish_retry_attempts", 2))
-        self.publish_retry_delay = int(settings.get("meta_publish_retry_delay", 60))
 
     def post_video(self, video_url, caption):
         return self._create_publish_container(video_url, caption, "VIDEO")
@@ -75,50 +71,22 @@ class InstagramPoster:
 
     def _publish_creation_id(self, creation_id):
         publish_url = f"{self.base_url}/media_publish"
-        last_response = None
+        publish_response = requests.post(
+            publish_url,
+            data={"creation_id": creation_id, "access_token": self.token},
+            timeout=60,
+        )
+        self._log_usage_headers(publish_response, "IG publish")
 
-        for attempt in range(1, self.publish_retry_attempts + 1):
-            publish_response = requests.post(
-                publish_url,
-                data={"creation_id": creation_id, "access_token": self.token},
-                timeout=60,
+        if publish_response.status_code != 200:
+            raise requests.HTTPError(
+                build_meta_error_message("IG publish failed", publish_response),
+                response=publish_response,
             )
-            self._log_usage_headers(publish_response, f"IG publish attempt {attempt}")
 
-            if publish_response.status_code == 200:
-                media_id = publish_response.json()["id"]
-                self.logger.info(f"IG published successfully: {media_id}")
-                return self._confirm_media_exists(media_id)
-
-            last_response = publish_response
-            meta_error = parse_meta_error(publish_response)
-            message = build_meta_error_message("IG publish failed", publish_response)
-            retryable = self._is_retryable_publish_error(meta_error)
-
-            if retryable and attempt < self.publish_retry_attempts:
-                wait_seconds = self.publish_retry_delay * attempt
-                self.logger.warning(
-                    f"{message}. Reusing same IG container and retrying publish in {wait_seconds}s"
-                )
-                time.sleep(wait_seconds)
-                continue
-
-            if retryable:
-                raise MetaPublishRetryExhausted(message, response=publish_response)
-
-            raise requests.HTTPError(message, response=publish_response)
-
-        raise MetaPublishRetryExhausted(
-            "IG publish failed after internal retries",
-            response=last_response,
-        )
-
-    def _is_retryable_publish_error(self, meta_error):
-        return (
-            meta_error.get("is_transient") is True
-            or meta_error.get("code") in {4, 17, 32, 341, 613}
-            or meta_error.get("subcode") in {2207051}
-        )
+        media_id = publish_response.json()["id"]
+        self.logger.info(f"IG published successfully: {media_id}")
+        return self._confirm_media_exists(media_id)
 
     def _log_usage_headers(self, response, label):
         app_usage = response.headers.get("x-app-usage")

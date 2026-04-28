@@ -4,7 +4,6 @@ import sys
 
 from dotenv import load_dotenv
 
-from core.retry_manager import SmartRetry
 from core.verifier import MediaVerifier
 from modules.caption_generator import CaptionGenerator
 from modules.dropbox_handler import DropboxHandler
@@ -37,14 +36,11 @@ def read_text_file(file_path):
         return handle.read().strip()
 
 
-def execute_with_fresh_link(retry_engine, post_method, dropbox_handler, file_metadata, caption):
-    def attempt():
-        public_url = dropbox_handler.get_temp_link(file_metadata)
-        if not public_url:
-            raise Exception("Could not create Dropbox temporary link")
-        return post_method(public_url, caption)
-
-    return retry_engine.execute(attempt)
+def post_with_fresh_link(post_method, dropbox_handler, file_metadata, caption):
+    public_url = dropbox_handler.get_temp_link(file_metadata)
+    if not public_url:
+        raise Exception("Could not create Dropbox temporary link")
+    return post_method(public_url, caption)
 
 
 def main():
@@ -57,10 +53,6 @@ def main():
     caption_generator = CaptionGenerator(config)
     instagram = InstagramPoster(config)
     threads = ThreadsPoster(config)
-    retry_engine = SmartRetry(
-        max_attempts=config.get("retry_count", 3),
-        backoff_base=config.get("retry_delay", 5),
-    )
     caption_limit = int(config.get("caption_limit", 2200))
     threads_text_limit = int(config.get("threads_text_limit", 500))
     threads_caption_limit = int(config.get("threads_caption_limit", caption_limit))
@@ -79,7 +71,7 @@ def main():
             if not text_content:
                 raise Exception("Threads text file is empty")
 
-            result = retry_engine.execute(threads.post_text, text_content)
+            result = threads.post_text(text_content)
             if result is True:
                 dropbox_handler.delete_file(text_metadata)
                 logger.info("Threads text post successful, Dropbox source file deleted")
@@ -136,15 +128,13 @@ def main():
         instagram_method = instagram.post_video if media_type == "video" else instagram.post_image
         threads_method = threads.post_video if media_type == "video" else threads.post_image
 
-        instagram_result = execute_with_fresh_link(
-            retry_engine,
+        instagram_result = post_with_fresh_link(
             instagram_method,
             dropbox_handler,
             file_metadata,
             caption,
         )
-        threads_result = execute_with_fresh_link(
-            retry_engine,
+        threads_result = post_with_fresh_link(
             threads_method,
             dropbox_handler,
             file_metadata,
