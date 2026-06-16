@@ -25,13 +25,23 @@ class CaptionGenerator:
 
     def _generate_instagram_caption(self, clean_name, media_type):
         system_instruction = (
-            "You write Instagram captions from filenames. "
-            "Write in 3 short sections with a blank linespace between sections. "
-            "Use emojis based on the emotion of the post. "
-            "Use around 10 to 15 emojis naturally, and never exceed 40 emojis total. "
-            "End with 5 to 7 relevant hashtags on the final line. "
-            "Do not add quotation marks. "
-            f"Do not add the fixed hashtag {self.fixed_tag}; it will be appended separately."
+            "You write Instagram captions from filenames."
+
+"Read the filename and infer the most likely topic, mood, scene, and audience. Do not mention that you are guessing."
+
+"Write a caption that feels natural, current, and human."
+"Make it discoverable with keyword-rich language that matches the post topic."
+"Start with a strong hook in the first line.
+Keep it in 3 short sections with a blank line between sections."
+"Use short, clean sentences."
+"Include the main keyword naturally 2 to 3 times, plus 1 to 2 supporting keywords."
+"Add a soft CTA near the end, such as asking a question, inviting a save, comment, or share."
+"Use emojis only when they fit the mood of the post, and keep them natural."
+"Never use quotation marks."
+"Never add the fixed hashtag {self.fixed_tag}; it will be appended separately."
+"End with 3 to 5 highly relevant hashtags on the final line."
+"Avoid generic, overused, or irrelevant hashtags."
+"Do not sound robotic, salesy, or overly promotional."
         )
 
         if media_type == "video":
@@ -65,14 +75,19 @@ class CaptionGenerator:
 
     def _generate_threads_caption(self, clean_name, media_type):
         system_instruction = (
-            "You write Threads captions from filenames. "
-            "Write in 3 or 4 short lines or short paragraphs with blank linespace between them. "
-            "Use emojis that fit the post. "
-            "Use around 5 to 10 emojis naturally, and never exceed 40 emojis total. "
-            "End with exactly 1 relevant hashtag on the final line. "
-            "Do not use the fixed hashtag from Instagram. "
-            "Do not add quotation marks. "
-            "Make it feel human, reflective, and suited for Threads."
+           " You write Threads captions from filenames."
+
+"Read the filename and infer the most likely topic, mood, scene, and audience. Do not mention that you are guessing."
+
+"Write in 3 or 4 short lines or short paragraphs with blank lines between them."
+"Make it feel human, reflective, and conversational."
+"Use one clear idea, one honest thought, or one small observation."
+"Include the main keyword naturally once.
+Use emojis that fit the post, but keep them light and organic."
+"Do not use the fixed Instagram hashtag."
+"Do not add quotation marks."
+"End with exactly 1 relevant hashtag on the final line."
+"Keep it thoughtful, clean, and suited for Threads."
         )
 
         if media_type == "video":
