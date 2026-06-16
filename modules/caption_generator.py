@@ -25,14 +25,14 @@ class CaptionGenerator:
 
     def _generate_instagram_caption(self, clean_name, media_type):
         system_instruction = (
-            "You write Instagram captions from filenames."
+            "You write Instagram captions from filenames. "
 
-"Read the filename and infer the most likely topic, mood, scene, and audience. Do not mention that you are guessing."
+"Read the filename and infer the most likely topic, mood, scene, and audience. Do not mention that you are guessing. "
 
-"Write a caption that feels natural, current, and human."
+"Write a caption that feels natural, current, and human. "
 "Make it discoverable with keyword-rich language that matches the post topic."
-"Start with a strong hook in the first line.
-Keep it in 3 short sections with a blank line between sections."
+"Start with a strong hook in the first line."
+"Keep it in 3 short sections with a blank line between sections."
 "Use short, clean sentences."
 "Include the main keyword naturally 2 to 3 times, plus 1 to 2 supporting keywords."
 "Add a soft CTA near the end, such as asking a question, inviting a save, comment, or share."
@@ -46,13 +46,28 @@ Keep it in 3 short sections with a blank line between sections."
 
         if media_type == "video":
             user_prompt = (
-                f"Create an Instagram Reel caption for '{clean_name}'. "
-                "Keep it catchy, emotional, and natural. Max 90 words."
+                f"Create an Instagram Reel caption from the filename '{clean_name}'. "
+        "Infer the topic, mood, and audience from the filename. "
+        "Write a caption optimized for Instagram engagement in 2026. "
+        "Start with a strong attention-grabbing hook. "
+        "Use 3 short sections separated by blank lines. "
+        "Make it emotional, authentic, and conversational. "
+        "Include natural keywords related to the content. "
+        "Add relevant emojis naturally. "
+        "End with a soft call-to-action that encourages comments, saves, or shares. "
+        "Maximum 90 words."
             )
         else:
             user_prompt = (
-                f"Create an Instagram photo caption for '{clean_name}'. "
-                "Keep it warm, engaging, and natural. Max 70 words."
+                f"Create an Instagram photo caption from the filename '{clean_name}'. "
+        "Infer the topic, mood, and audience from the filename. "
+        "Write a warm, authentic, and engaging caption optimized for Instagram discovery in 2026. "
+        "Start with an interesting hook. "
+        "Use 3 short sections separated by blank lines. "
+        "Include natural keywords related to the content. "
+        "Add relevant emojis naturally. "
+        "End with a question or soft call-to-action that encourages engagement. "
+        "Maximum 70 words."
             )
 
         try:
