@@ -98,8 +98,8 @@ class CaptionGenerator:
 "Write in 3 or 4 short lines or short paragraphs with blank lines between them."
 "Make it feel human, reflective, and conversational."
 "Use one clear idea, one honest thought, or one small observation."
-"Include the main keyword naturally once.
-Use emojis that fit the post, but keep them light and organic."
+"Include the main keyword naturally once."
+"Use emojis that fit the post, but keep them light and organic."
 "Do not use the fixed Instagram hashtag."
 "Do not add quotation marks."
 "End with exactly 1 relevant hashtag on the final line."
